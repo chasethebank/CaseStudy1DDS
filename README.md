@@ -27,3 +27,6 @@ Additional Findings:
 Gender and Relationship Satisfaction showed no significant relationship with attrition
 Stock Option Level was a strong predictor — employees with no stock options had much higher attrition rates
 Marital Status was significant — single employees had higher attrition rates than married or divorced employees
+
+Link to Youtube: 
+https://youtu.be/9Q0orRQZbNo
