@@ -1,0 +1,442 @@
+---
+title: "Project 1 Frito Lay Attrition Analysis"
+author: "Chase Mastey"
+date: "2026-02-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load packages
+```{r}
+library(tidyverse) 
+library(ggplot2) 
+library(broom) 
+library(stringr) 
+library(class) 
+library(caret) 
+library(e1071) 
+library(dplyr)
+```
+
+##Import Data
+```{r}
+CaseStudy1 <- read.csv("CaseStudy1-data.csv")
+```
+
+## View data types
+```{r}
+str(CaseStudy1)
+summary(CaseStudy1)
+head(CaseStudy1)
+```
+
+## Getting rid of Employee Count and Standard Hours
+```{r}
+CaseStudy1$EmployeeCount <- NULL
+CaseStudy1$StandardHours <- NULL
+CaseStudy1$Over18<- NULL
+CaseStudy1$EmployeeNumber<- NULL
+CaseStudy1$ID<- NULL
+```
+
+#Visualize Attrition
+```{r}
+ggplot(CaseStudy1, aes(x = Attrition)) + geom_bar(aes(y = (..count..)/sum(..count..) * 100), fill = "steelblue") + labs(title = "Employee Attrition Distribution", x = "Attrition", y = "Percentage") + theme_minimal()
+```
+## Convert to Factors
+```{r}
+CaseStudy1$Attrition <- factor(CaseStudy1$Attrition, levels = c("Yes","No"))
+
+## Convert BusinessTravel to a Factor (1=Non-Travel, 2=Travel Frequently, 3=Travel Rarely)
+CaseStudy1$BusinessTravel <- factor(CaseStudy1$BusinessTravel, labels = c("Non-Travel", "Travel_Frequently", "Travel_Rarely"))
+
+## Convert Department to a Factor (1=Human Resources, 2=Research & Development, 3=Sales)
+CaseStudy1$Department <- factor(CaseStudy1$Department, labels = c("Human Resources", "Research & Development", "Sales"))
+
+## Convert to Education to a Factor
+CaseStudy1$Education <- factor(CaseStudy1$Education, levels = c(1,2,3,4,5), labels = c("Below College", "College", "Bachelor", "Master", "Doctor"), ordered = TRUE)
+
+## Convert Education Field to a Factor
+CaseStudy1$EducationField <- as.factor(CaseStudy1$EducationField)
+
+## Convert Environment Satisfaction to a Factor
+CaseStudy1$EnvironmentSatisfaction <- factor(
+  CaseStudy1$EnvironmentSatisfaction, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE )
+
+## Convert Gender to a Factor
+CaseStudy1$Gender <- as.factor(CaseStudy1$Gender)
+
+## Convert Job Involvement to a Factor
+CaseStudy1$JobInvolvement <- factor(
+  CaseStudy1$JobInvolvement, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE )
+
+## Convert Job Level to a Factor
+CaseStudy1$JobLevel <- factor(
+  CaseStudy1$JobLevel, levels = c(1,2,3,4,5), labels = c("Entry Level", "Junior Level", "Mid Level", "Senior Level", "Executive Level"), ordered = TRUE )
+
+## Convert Job Role to a Factor
+CaseStudy1$JobRole <- as.factor(CaseStudy1$JobRole)
+
+## Convert Job Satisfaction to a Factor
+CaseStudy1$JobSatisfaction <- factor(
+  CaseStudy1$JobSatisfaction, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE )
+
+## Convert Marital Status to a Factor
+CaseStudy1$MaritalStatus <- as.factor(CaseStudy1$MaritalStatus)
+
+## Convert Overtime to a Factor
+CaseStudy1$OverTime <- as.factor(CaseStudy1$OverTime)
+
+## Convert Performance Rating to a Factor
+CaseStudy1$PerformanceRating <- factor(
+  CaseStudy1$PerformanceRating, levels = c(1,2,3,4), labels = c("Low", "Good", "Excellent", "Outstanding"), ordered = TRUE )
+
+## Convert Relationship Satisfaction to a Factor
+CaseStudy1$RelationshipSatisfaction <- factor(
+  CaseStudy1$RelationshipSatisfaction, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE )
+
+## Convert Stock Option Level to a Factor
+CaseStudy1$StockOptionLevel <- factor(
+  CaseStudy1$StockOptionLevel, levels = c(0,1,2,3), labels = c("None", "Low", "Medium", "High"), ordered = TRUE )
+
+## Convert Work-Life Balance to a Factor
+CaseStudy1$WorkLifeBalance <- factor(
+  CaseStudy1$WorkLifeBalance, levels = c(1,2,3,4), labels = c("Bad", "Good", "Better", "Best"), ordered = TRUE )
+```
+##Categorical variable Chi-Squared
+```{r}
+chisq.test(table(CaseStudy1$OverTime, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$MaritalStatus, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$JobRole, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$JobLevel, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$BusinessTravel, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$Department, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$EducationField, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$EnvironmentSatisfaction, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$JobInvolvement, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$JobSatisfaction, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$WorkLifeBalance, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$StockOptionLevel, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$RelationshipSatisfaction, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$Gender, CaseStudy1$Attrition)) 
+chisq.test(table(CaseStudy1$Education, CaseStudy1$Attrition))
+```
+#Categorical Variable plots
+```{r}
+#Attrition by Overtime
+CaseStudy1 %>% group_by(OverTime) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = OverTime, y = AttritionRate, fill = OverTime)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + scale_fill_manual(values = c("No" = "tomato", "Yes" = "steelblue")) + ylim(0, 40) + labs(title = "Attrition Rate by Overtime", x = "Overtime", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Martial Status 
+CaseStudy1 %>% group_by(MaritalStatus) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = MaritalStatus, y = AttritionRate, fill = MaritalStatus)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Marital Status", x = "Marital Status", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Job Role
+CaseStudy1 %>% group_by(JobRole) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = JobRole, y = AttritionRate, fill = JobRole)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), hjust = -0.2) + ylim(0, 60) + labs(title = "Attrition Rate by Job Role", x = "Job Role", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none") + coord_flip()
+
+#Attrition by Job Level
+CaseStudy1 %>% group_by(JobLevel) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = JobLevel, y = AttritionRate, fill = JobLevel)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), hjust = -0.2) + ylim(0, 40) + labs(title = "Attrition Rate by Job Level", x = "Job Level", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none") + coord_flip()
+
+#Attrition by Stock Option Level
+CaseStudy1 %>% group_by(StockOptionLevel) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = StockOptionLevel, y = AttritionRate, fill = StockOptionLevel)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Stock Option Level", x = "Stock Option Level", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Job Involvement
+CaseStudy1 %>% group_by(JobInvolvement) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = JobInvolvement, y = AttritionRate, fill = JobInvolvement)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 60) + labs(title = "Attrition Rate by Job Involvement", x = "Job Involvement", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+
+#Attrition by Department
+CaseStudy1 %>% group_by(Department) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = Department, y = AttritionRate, fill = Department)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), hjust = -0.2) + ylim(0, 40) + labs(title = "Attrition Rate by Department", x = "Department", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none") + coord_flip()
+
+
+#Attrition by Work Life Balance
+CaseStudy1 %>% group_by(WorkLifeBalance) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = WorkLifeBalance, y = AttritionRate, fill = WorkLifeBalance)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Work Life Balance", x = "Work Life Balance", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Environment Satisfaction
+CaseStudy1 %>% group_by(EnvironmentSatisfaction) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = EnvironmentSatisfaction, y = AttritionRate, fill = EnvironmentSatisfaction)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Environment Satisfaction", x = "Environment Satisfaction", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Job Satisfaction
+CaseStudy1 %>% group_by(JobSatisfaction) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = JobSatisfaction, y = AttritionRate, fill = JobSatisfaction)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Job Satisfaction", x = "Job Satisfaction", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Business Travel
+CaseStudy1 %>% group_by(BusinessTravel) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = BusinessTravel, y = AttritionRate, fill = BusinessTravel)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Business Travel", x = "Business Travel", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Relationship Satisfaction
+CaseStudy1 %>% group_by(RelationshipSatisfaction) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = RelationshipSatisfaction, y = AttritionRate, fill = RelationshipSatisfaction)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Relationship Satisfaction", x = "Relationship Satisfaction", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Gender
+CaseStudy1 %>% group_by(Gender) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = Gender, y = AttritionRate, fill = Gender)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Gender", x = "Gender", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Education
+CaseStudy1 %>% group_by(Education) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = Education, y = AttritionRate, fill = Education)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), vjust = -0.5) + ylim(0, 40) + labs(title = "Attrition Rate by Education", x = "Education", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none")
+
+#Attrition by Education Field
+CaseStudy1 %>% group_by(EducationField) %>% summarise(AttritionRate = mean(Attrition == "Yes") * 100) %>% ggplot(aes(x = EducationField, y = AttritionRate, fill = EducationField)) + geom_col() + geom_text(aes(label = paste0(round(AttritionRate, 1), "%")), hjust = -0.2) + ylim(0, 40) + labs(title = "Attrition Rate by Education Field", x = "Education Field", y = "Attrition Rate (%)") + theme_classic() + theme(legend.position = "none") + coord_flip()
+```
+
+## Numeric Variable Histograms
+```{r}
+#Attrition by Age
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = Age)) + geom_histogram(binwidth = 2) + labs(title = "Age Distribution", x = "Age", y = "Employee Count") + theme_classic()
+
+# Attrition by Daily Rate
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = DailyRate)) + geom_histogram(binwidth = 100) + labs(title = "Daily Rate Distribution", x = "Daily Rate", y = "Employee Count") + theme_classic()
+
+## Distance from Home
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = DistanceFromHome)) + geom_histogram(binwidth = 1) + labs(title = "Distance From Home Distribution", x = "Distance From Home", y = "Employee Count") + theme_classic()
+
+## Hourly Rate
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = HourlyRate)) +
+  geom_histogram(binwidth = 5) +
+  labs(title = "Hourly Rate Distribution",
+       x = "Hourly Rate ($)", y = "Employee Count") + theme_classic()
+
+## Monthly Income
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = MonthlyIncome)) +
+  geom_histogram(binwidth = 1000) +
+  labs(title = "Monthly Income Distribution",
+       x = "Monthly Income ($)", y = "Employee Count") + theme_classic()
+
+## Monthly Rate
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = MonthlyRate)) +
+  geom_histogram(binwidth = 2000) +
+  labs(title = "Monthly Rate Distribution",
+       x = "Monthly Rate($)", y = "Employee Count") + theme_classic()
+
+## Number of Companies Worked
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = NumCompaniesWorked)) + geom_histogram(binwidth = 1) + labs(title = "Number of Companies Worked Distribution", x = "Number of Companies Worked", y = "Employee Count") + theme_classic()
+
+## Percent Salary Hike
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = PercentSalaryHike)) + geom_histogram(binwidth = 1) + labs(title = "Percent Salary Hike Distribution", x = "Percent Salary Hike", y = "Employee Count") + theme_classic()
+
+## Total Working Years
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = TotalWorkingYears)) + geom_histogram(binwidth = 2) + labs(title = "Total Working Years Distribution", x = "Total Working Years", y = "Employee Count") + theme_classic()
+
+## Training Times Last Year
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = TrainingTimesLastYear)) + geom_histogram(binwidth = 1) + labs(title = "Training Times Last Year Distribution", x = "Training Times Last Year", y = "Employee Count") + theme_classic()
+## Years at Company
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = YearsAtCompany)) + geom_histogram(binwidth = 1) + labs(title = "Years At Company Distribution", x = "Years At Company", y = "Employee Count") + theme_classic()
+## Years Since Last Promotion
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = YearsSinceLastPromotion)) + geom_histogram(binwidth = 1) + labs(title = "Years Since Last Promotion Distribution", x = "Years Since Last Promotion", y = "Employee Count") + theme_classic()
+## Years with Current Manager
+ggplot(CaseStudy1[CaseStudy1$Attrition == "Yes", ], aes(x = YearsWithCurrManager)) + geom_histogram(binwidth = 1) + labs(title = "Years With Current Manager Distribution", x = "Years With Current Manager", y = "Employee Count") + theme_classic()
+```
+
+
+## Numeric Variable Boxplots
+```{r}
+## Age
+ggplot(CaseStudy1, aes(x = Attrition, y = Age, fill = Attrition)) + geom_boxplot() + labs(title = "Age by Attrition", x = "Attrition", y = "Age") + theme_classic()
+## Daily Rate
+ggplot(CaseStudy1, aes(x = Attrition, y = DailyRate, fill = Attrition)) + geom_boxplot() + labs(title = "Daily Rate by Attrition", x = "Attrition", y = "Daily Rate") + theme_classic()
+## Distance From Home
+ggplot(CaseStudy1, aes(x = Attrition, y = DistanceFromHome, fill = Attrition)) + geom_boxplot() + labs(title = "Distance From Home by Attrition", x = "Attrition", y = "Distance From Home") + theme_classic()
+## Hourly Rate
+ggplot(CaseStudy1, aes(x = Attrition, y = HourlyRate, fill = Attrition)) + geom_boxplot() + labs(title = "Hourly Rate by Attrition", x = "Attrition", y = "Hourly Rate") + theme_classic()
+## Monthly Income
+ggplot(CaseStudy1, aes(x = Attrition, y = MonthlyIncome, fill = Attrition)) + geom_boxplot() + labs(title = "Monthly Income by Attrition", x = "Attrition", y = "Monthly Income") + theme_classic()
+## Monthly Rate
+ggplot(CaseStudy1, aes(x = Attrition, y = MonthlyRate, fill = Attrition)) + geom_boxplot() + labs(title = "Monthly Rate by Attrition", x = "Attrition", y = "Monthly Rate") + theme_classic()
+## Number of Companies Worked For
+ggplot(CaseStudy1, aes(x = Attrition, y = NumCompaniesWorked, fill = Attrition)) + geom_boxplot() + labs(title = "Number of Companies Worked by Attrition", x = "Attrition", y = "Number of Companies Worked") + theme_classic()
+## Percent Salary Hike
+ggplot(CaseStudy1, aes(x = Attrition, y = PercentSalaryHike, fill = Attrition)) + geom_boxplot() + labs(title = "Percent Salary Hike by Attrition", x = "Attrition", y = "Percent Salary Hike") + theme_classic()
+## Total Working Years
+ggplot(CaseStudy1, aes(x = Attrition, y = TotalWorkingYears, fill = Attrition)) + geom_boxplot() + labs(title = "Total Working Years by Attrition", x = "Attrition", y = "Total Working Years") + theme_classic()
+## Training Times Last Year
+ggplot(CaseStudy1, aes(x = Attrition, y = TrainingTimesLastYear, fill = Attrition)) + geom_boxplot() + labs(title = "Training Times Last Year by Attrition", x = "Attrition", y = "Training Times Last Year") + theme_classic()
+## Years at Company
+ggplot(CaseStudy1, aes(x = Attrition, y = YearsAtCompany, fill = Attrition)) + geom_boxplot() + labs(title = "Years At Company by Attrition", x = "Attrition", y = "Years At Company") + theme_classic()
+## Years in Current Role
+ggplot(CaseStudy1, aes(x = Attrition, y = YearsInCurrentRole, fill = Attrition)) + geom_boxplot() + labs(title = "Years In Current Role by Attrition", x = "Attrition", y = "Years In Current Role") + theme_classic()
+## Years Since Last Promotion
+ggplot(CaseStudy1, aes(x = Attrition, y = YearsSinceLastPromotion, fill = Attrition)) + geom_boxplot() + labs(title = "Years Since Last Promotion by Attrition", x = "Attrition", y = "Years Since Last Promotion") + theme_classic()
+## Years With Current Manager
+ggplot(CaseStudy1, aes(x = Attrition, y = YearsWithCurrManager, fill = Attrition)) + geom_boxplot() + labs(title = "Years With Current Manager by Attrition", x = "Attrition", y = "Years With Current Manager") + theme_classic()
+```
+#KNN
+```{r}
+set.seed(6306)
+
+CaseStudy1KNN <- CaseStudy1
+
+CaseStudy1KNN$ZTotalWorkingYears <- scale(CaseStudy1KNN$TotalWorkingYears)
+CaseStudy1KNN$ZYearsInCurrentRole <- scale(CaseStudy1KNN$YearsInCurrentRole)
+CaseStudy1KNN$ZMonthlyIncome <- scale(CaseStudy1KNN$MonthlyIncome)
+CaseStudy1KNN$ZAge <- scale(CaseStudy1KNN$Age)
+CaseStudy1KNN$ZYearsWithCurrManager <- scale(CaseStudy1KNN$YearsWithCurrManager)
+
+
+# Train/Split
+splitPerc <- 0.75
+trainIndices <- sample(1:dim(CaseStudy1KNN)[1], round(splitPerc * dim(CaseStudy1KNN)[1]))
+train <- CaseStudy1KNN[trainIndices, ]
+test <- CaseStudy1KNN[-trainIndices, ]
+
+# k = 3
+classifications <- knn(train[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                       test[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                       train$Attrition, prob = TRUE, k = 3)
+table(test$Attrition, classifications)
+CM <- confusionMatrix(table(test$Attrition, classifications))
+CM
+CM$overall["Accuracy"]
+CM$byClass["Sensitivity"]
+CM$byClass["Specificity"]
+
+# k = 5
+classifications <- knn(train[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                       test[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                       train$Attrition, prob = TRUE, k = 5)
+table(test$Attrition, classifications)
+CM <- confusionMatrix(table(test$Attrition, classifications))
+CM
+CM$overall["Accuracy"]
+CM$byClass["Sensitivity"]
+CM$byClass["Specificity"]
+
+# k = 10
+classifications <- knn(train[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                       test[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                       train$Attrition, prob = TRUE, k = 10)
+table(test$Attrition, classifications)
+CM <- confusionMatrix(table(test$Attrition, classifications))
+CM
+CM$overall["Accuracy"]
+CM$byClass["Sensitivity"]
+CM$byClass["Specificity"]
+
+# Loop K = 1 to 30
+accs = data.frame(accuracy = numeric(30), k = numeric(30))
+for(i in 1:30)
+{
+  classifications = knn(train[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                        test[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                        train$Attrition, prob = TRUE, k = i)
+  CM = confusionMatrix(table(test$Attrition, classifications))
+  accs$accuracy[i] = CM$overall[1]
+  accs$k[i] = i
+}
+plot(accs$k, accs$accuracy, type = "l", xlab = "k", ylab = "Accuracy", main = "Accuracy by K")
+
+# Find best k
+bestk = accs$k[which.max(accs$accuracy)]
+bestk
+classifications = knn(train[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                      test[, c("ZTotalWorkingYears", "ZYearsInCurrentRole", "ZMonthlyIncome", "ZAge", "ZYearsWithCurrManager")],
+                      train$Attrition, prob = TRUE, k = bestk)
+table(test$Attrition, classifications)
+CM = confusionMatrix(table(test$Attrition, classifications))
+CM
+
+# Adjust threshold
+attributes(classifications)$prob
+probs = ifelse(classifications == "Yes", attributes(classifications)$prob,
+               1 - attributes(classifications)$prob)
+threshold = 0.5
+NewClass = factor(ifelse(probs > threshold, "Yes", "No"), levels = c("Yes", "No"))
+table(test$Attrition, NewClass)
+CM = confusionMatrix(table(test$Attrition, NewClass))
+CM
+
+# KNN Confusion Matrix
+cm_table = as.data.frame(table(Actual = test$Attrition, Predicted = NewClass))
+ggplot(cm_table, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), size = 8) +
+  scale_fill_gradient(low = "white", high = "steelblue", limits = c(0, 180)) +
+  scale_x_discrete(limits = c("No", "Yes")) +
+  scale_y_discrete(limits = c("No", "Yes")) +
+  labs(title = "KNN Confusion Matrix",
+       x = "Actual Attrition",
+       y = "Predicted Attrition") +
+  theme_classic()
+```
+
+# Naive Bayes Model #1
+```{r}
+model = naiveBayes(train[, c("TotalWorkingYears", "YearsInCurrentRole", 
+                              "MonthlyIncome", "Age",
+                              "OverTime", "StockOptionLevel", 
+                              "JobInvolvement", "MaritalStatus")],
+                   train$Attrition)
+
+table(predict(model, test[, c("TotalWorkingYears", "YearsInCurrentRole",
+                               "MonthlyIncome", "Age",
+                               "OverTime", "StockOptionLevel",
+                               "JobInvolvement", "MaritalStatus")]),
+      test$Attrition)
+
+CM = confusionMatrix(table(predict(model, test[, c("TotalWorkingYears", "YearsInCurrentRole",
+                                                    "MonthlyIncome", "Age",
+                                                    "OverTime", "StockOptionLevel",
+                                                    "JobInvolvement", "MaritalStatus")]),
+                           test$Attrition))
+CM
+
+# Adjust NB Threshold 
+probs_nb = predict(model, test[, c("TotalWorkingYears", "YearsInCurrentRole",
+                                    "MonthlyIncome", "Age",
+                                    "OverTime", "StockOptionLevel",
+                                    "JobInvolvement", "MaritalStatus")], 
+                   type = "raw")
+
+probs_nb
+
+threshold = 0.45
+
+NewClass_nb = factor(ifelse(probs_nb[, "Yes"] > threshold, "Yes", "No"), levels = c("Yes", "No"))
+
+table(test$Attrition, NewClass_nb)
+
+CM = confusionMatrix(table(test$Attrition, NewClass_nb))
+CM
+
+
+#Naive Bayes Confusion Matrix
+nb_table = as.data.frame(table(Actual = test$Attrition, Predicted = NewClass_nb))
+
+ggplot(nb_table, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), size = 8) +
+  scale_fill_gradient(low = "white", high = "steelblue", limits = c(0, 180)) +
+  scale_x_discrete(limits = c("No", "Yes")) +
+  scale_y_discrete(limits = c("No", "Yes")) +
+  labs(title = "Naive Bayes Confusion Matrix",
+       x = "Actual Attrition",
+       y = "Predicted Attrition") +
+  theme_classic()
+
+```
+#CompSet
+```{r}
+CompSet <- read.csv("CaseStudy1CompSet No Attrition.csv")
+
+CompSet$BusinessTravel <- factor(CompSet$BusinessTravel, labels = c("Non-Travel", "Travel_Frequently", "Travel_Rarely"))
+CompSet$Department <- factor(CompSet$Department, labels = c("Human Resources", "Research & Development", "Sales"))
+CompSet$Education <- factor(CompSet$Education, levels = c(1,2,3,4,5), labels = c("Below College", "College", "Bachelor", "Master", "Doctor"), ordered = TRUE)
+CompSet$EducationField <- as.factor(CompSet$EducationField)
+CompSet$EnvironmentSatisfaction <- factor(CompSet$EnvironmentSatisfaction, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE)
+CompSet$Gender <- as.factor(CompSet$Gender)
+CompSet$JobInvolvement <- factor(CompSet$JobInvolvement, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE)
+CompSet$JobLevel <- factor(CompSet$JobLevel, levels = c(1,2,3,4,5), labels = c("Entry Level", "Junior Level", "Mid Level", "Senior Level", "Executive Level"), ordered = TRUE)
+CompSet$JobRole <- as.factor(CompSet$JobRole)
+CompSet$JobSatisfaction <- factor(CompSet$JobSatisfaction, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE)
+CompSet$MaritalStatus <- as.factor(CompSet$MaritalStatus)
+CompSet$OverTime <- as.factor(CompSet$OverTime)
+CompSet$PerformanceRating <- factor(CompSet$PerformanceRating, levels = c(1,2,3,4), labels = c("Low", "Good", "Excellent", "Outstanding"), ordered = TRUE)
+CompSet$RelationshipSatisfaction <- factor(CompSet$RelationshipSatisfaction, levels = c(1,2,3,4), labels = c("Low", "Medium", "High", "Very High"), ordered = TRUE)
+CompSet$StockOptionLevel <- factor(CompSet$StockOptionLevel, levels = c(0,1,2,3), labels = c("None", "Low", "Medium", "High"), ordered = TRUE)
+CompSet$WorkLifeBalance <- factor(CompSet$WorkLifeBalance, levels = c(1,2,3,4), labels = c("Bad", "Good", "Better", "Best"), ordered = TRUE)
+
+
+#NB on Comp Set
+CompPredictions <- predict(model, CompSet[, c("TotalWorkingYears", "YearsInCurrentRole",
+                                               "MonthlyIncome", "Age",
+                                               "OverTime", "StockOptionLevel",
+                                               "JobInvolvement", "MaritalStatus")])
+
+predictions_df <- data.frame(ID = CompSet$ID, Attrition = CompPredictions)
+
+write.csv(predictions_df, "Case1PredictionsMastey Attrition.csv", row.names = FALSE)
+```
